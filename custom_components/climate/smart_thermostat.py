@@ -1,6 +1,5 @@
 """
 Adds support for generic thermostat units.
-
 For more details about this platform, please refer to the documentation at
 https://github.com/fabiannydegger/custom_components/
 """
@@ -26,7 +25,7 @@ from homeassistant.helpers import condition
 from homeassistant.helpers.event import (
     async_track_state_change, async_track_time_interval)
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.restore_state import async_get_last_state
+from homeassistant.helpers.restore_state import RestoreEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +61,9 @@ CONF_KD = 'kd'
 CONF_PWM = 'pwm'
 CONF_AUTOTUNE = 'autotune'
 CONF_NOISEBAND = 'noiseband'
+SERVICE_SET_VALUE = 'set_value'
+ATTR_VALUE = 'value'
+PLATFORM_INPUT_NUMBER = 'input_number'
 
 SUPPORT_FLAGS = (SUPPORT_TARGET_TEMPERATURE |
                  SUPPORT_OPERATION_MODE)
@@ -124,7 +126,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
         kd, pwm, autotune, noiseband)])
 
 
-class SmartThermostat(ClimateDevice):
+class SmartThermostat(ClimateDevice, RestoreEntity):
     """Representation of a Smart Thermostat device."""
 
     def __init__(self, hass, name, heater_entity_id, sensor_entity_id,
@@ -201,12 +203,11 @@ class SmartThermostat(ClimateDevice):
         if sensor_state and sensor_state.state != STATE_UNKNOWN:
             self._async_update_temp(sensor_state)
 
-    @asyncio.coroutine
-    def async_added_to_hass(self):
+    async def async_added_to_hass(self):
         """Run when entity about to be added."""
+        await super().async_added_to_hass()
         # Check If we have an old state
-        old_state = yield from async_get_last_state(self.hass,
-                                                    self.entity_id)
+        old_state = await self.async_get_last_state()
         if old_state is not None:
             # If we have no initial temperature, restore
             if self._target_temp is None:
@@ -431,6 +432,20 @@ class SmartThermostat(ClimateDevice):
         data = {ATTR_ENTITY_ID: self.heater_entity_id}
         self.hass.async_add_job(
             self.hass.services.async_call(HA_DOMAIN, SERVICE_TURN_OFF, data))
+		
+    @callback		
+    def _set_valve(self):
+        """set valve opening percentage."""
+        data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_VALUE: self.control_output }
+        self.hass.async_add_job(
+            self.hass.services.async_call(PLATFORM_INPUT_NUMBER, SERVICE_SET_VALUE, data ))
+			
+#	@callback
+#	def _set_valve(self):
+#        """set valve opening percentage."""
+#        data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_value: self.control_output }
+#		self.hass.async_add_job(
+#			self.hass.services.async_call(HA_DOMAIN, SERVICE_SET_VALUE, data ))
 
     @property
     def is_away_mode_on(self):
@@ -491,8 +506,9 @@ class SmartThermostat(ClimateDevice):
                     self._heater_turn_off()
                     self.time_changed = time.time()
         else:
-            _LOGGER.info("Change state off heater %s to %s", self.heater_entity_id, self.control_output)
-            self.hass.states.async_set(self.heater_entity_id, self.control_output)
+            _LOGGER.info("Change state of heater %s to %s", self.heater_entity_id, self.control_output)
+            #self.hass.states.async_set(self.heater_entity_id, self.control_output)
+            self._set_valve()
 
         
     def pwm_switch(self, time_on, time_off, time_passed):

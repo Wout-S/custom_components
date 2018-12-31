@@ -33,17 +33,20 @@ class PIDArduino(object):
             raise ValueError('out_min must be less than out_max')
 
         self._logger = logging.getLogger(type(self).__name__)
-        self._Kp = kp
-        self._Ki = ki * sampletime
-        self._Kd = kd / sampletime
-        self._sampletime = sampletime * 1000
+        self._time = time
+        now = self._time()
+        self._last_calc_timestamp = now - sampletime
+#        sampletime=self._time-self._last_calc_timestamp
+        self._kp = kp
+        self._ki = ki
+        self._kd = kd
+#        self._sampletime = sampletime * 1000
         self._out_min = out_min
         self._out_max = out_max
         self._integral = 0
         self._last_input = 0
         self._last_output = 0
-        self._last_calc_timestamp = 0
-        self._time = time
+
 
     def calc(self, input_val, setpoint):
         """Adjusts and holds the given setpoint.
@@ -55,10 +58,12 @@ class PIDArduino(object):
         Returns:
             A value between `out_min` and `out_max`.
         """
-        now = self._time() * 1000
-
-        if (now - self._last_calc_timestamp) < self._sampletime:
-            return self._last_output
+        now = self._time()
+        dt = now - self._last_calc_timestamp
+        self._Kp = self._kp
+        self._Ki = self._ki * dt
+        self._Kd = self._kd / dt
+        self._logger.debug('dt: {0}'.format(dt))
 
         # Compute all the working error variables
         error = setpoint - input_val

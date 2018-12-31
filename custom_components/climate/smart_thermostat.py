@@ -209,6 +209,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         # Check If we have an old state
         old_state = await self.async_get_last_state()
         if old_state is not None:
+            _LOGGER.info("Found old state")
             # If we have no initial temperature, restore
             if self._target_temp is None:
                 # If we have a previously saved temperature
@@ -321,6 +322,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         if temperature is None:
             return
         self._target_temp = temperature
+        _LOGGER.info("async_set_temperature called, new temperature: %s", self._target_temp)
         self._async_control_heating()
         yield from self.async_update_ha_state()
 
@@ -372,7 +374,9 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
     @callback
     def _async_keep_alive(self, time):
         """Call at constant intervals for keep-alive purposes."""
+        _LOGGER.info("keep_alive called, time: %s", time)
         if self._active:
+            _LOGGER.info("self._active true, keep_alive call _async_control_heating")
             self._async_control_heating()
 
     @callback
@@ -389,7 +393,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
     @callback
     def _async_control_heating(self):
         """Run PID controller, optional autotune for faster integration"""
-
+        _LOGGER.info("in _async_control_heating, self._active: %s", self._active)
         if not self._active and None not in (self._cur_temp, self._target_temp
                                              ):
             self._active = True
@@ -483,8 +487,10 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
                 self.autotune = "none"
             self.control_output = self.pidAutotune.output
         else:
+            _LOGGER.info("Calculating PID values")
             self.control_output = self.pidController.calc(self._cur_temp,
             self._target_temp)
+        self.control_output=round(self.control_output)
         _LOGGER.info("Obtained current control output. %s", self.control_output)
         self.set_controlvalue();
 

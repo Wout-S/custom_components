@@ -1,5 +1,6 @@
 import math
 import logging
+import numpy
 from time import time
 from collections import deque, namedtuple
 

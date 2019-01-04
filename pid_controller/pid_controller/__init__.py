@@ -71,6 +71,10 @@ class PIDArduino(object):
         self._logger.debug('dt: {0}'.format(self._dt))
         self._input.append(input_val)
         self._logger.debug('Last input values: {0}'.format(self._input))
+        
+        if len(self._input) < len(self._e):
+            self._input.extend([input_val,input_val,input_val])
+            self._logger.debug('Not enough input values, all set to current input: {0}'.format(self._input))
 
         # Compute all the working error variables
         error = setpoint - input_val
@@ -80,11 +84,15 @@ class PIDArduino(object):
         if self._ki != 0:
             self._Ti = self._kp / self._ki
             self._logger.debug('Ti: {0}'.format(self._Ti))
-            self._integral += self._Kp*(self._dt[1]/self._Ti)*self._e[2]
+            if self._last_output < self._out_max and self._last_output > self._out_min:
+                self._integral += self._Kp*(self._dt[1]/self._Ti)*self._e[2]
+                self._integral = min(self._integral, self._out_max)
+                self._integral = max(self._integral, self._out_min)
+        
         # Derivative
         timevec=np.array([0, self._dt[0], self._dt[0]+self._dt[1]])
         self._logger.debug('timevec: {0}'.format(timevec))
-        datavec=np.array(self._e)
+        datavec=np.array(self._input)
         self._logger.debug('datavec: {0}'.format(datavec))
         pol=np.polyfit(timevec,datavec,2)
         self._logger.debug('polynomial: {0}'.format(pol))

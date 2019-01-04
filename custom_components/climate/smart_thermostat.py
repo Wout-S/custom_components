@@ -135,6 +135,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
                  initial_operation_mode, difference, away_temp, kp, ki,
                  kd, pwm, autotune, noiseband):
         """Initialize the thermostat."""
+        _LOGGER.info("Initializing smart thermostat")
         self.hass = hass
         self._name = name
         self.heater_entity_id = heater_entity_id
@@ -196,6 +197,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
             hass, heater_entity_id, self._async_switch_changed)
 
         if self._keep_alive:
+            _LOGGER.info("Track keep alive interval")
             async_track_time_interval(
                 hass, self._async_keep_alive, self._keep_alive)
 
@@ -205,6 +207,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
 
     async def async_added_to_hass(self):
         """Run when entity about to be added."""
+        _LOGGER.info("Added to hass, searching for old state")
         await super().async_added_to_hass()
         # Check If we have an old state
         old_state = await self.async_get_last_state()
@@ -241,6 +244,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
                     self._target_temp = self.min_temp
             _LOGGER.warning("No previously saved temperature, setting to %s",
                             self._target_temp)
+        self._async_control_heating()
 
     @property
     def state(self):
@@ -375,9 +379,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
     def _async_keep_alive(self, time):
         """Call at constant intervals for keep-alive purposes."""
         _LOGGER.info("keep_alive called, time: %s", time)
-        if self._active:
-            _LOGGER.info("self._active true, keep_alive call _async_control_heating")
-            self._async_control_heating()
+        self._async_control_heating()
 
     @callback
     def _async_update_temp(self, state):

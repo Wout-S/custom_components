@@ -445,13 +445,6 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_VALUE: self.control_output }
         self.hass.async_add_job(
             self.hass.services.async_call(PLATFORM_INPUT_NUMBER, SERVICE_SET_VALUE, data ))
-			
-#	@callback
-#	def _set_valve(self):
-#        """set valve opening percentage."""
-#        data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_value: self.control_output }
-#		self.hass.async_add_job(
-#			self.hass.services.async_call(HA_DOMAIN, SERVICE_SET_VALUE, data ))
 
     @property
     def is_away_mode_on(self):
@@ -535,3 +528,4 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
                 self.time_changed = time.time()
             else:
                 _LOGGER.info("Time until %s turns on: %s sec", self.heater_entity_id, time_off - time_passed)
+                

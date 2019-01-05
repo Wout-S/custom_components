@@ -37,18 +37,14 @@ class PIDArduino(object):
         self._time = time
         now = self._time()
         self._last_calc_timestamp = now - sampletime
-#        sampletime=self._time-self._last_calc_timestamp
         self._kp = kp
         self._ki = ki
         self._kd = kd
-#        self._sampletime = sampletime * 1000
         self._out_min = out_min
         self._out_max = out_max
-        self._new_output = 0
         self._dt = deque([sampletime,sampletime],maxlen=2)
         self._e = deque([0,0,0],maxlen=3)
         self._input = deque(maxlen=3)
-        self._last_setpoint = 0
         self._integral=0
 
     def calc(self, input_val, setpoint):
@@ -64,16 +60,18 @@ class PIDArduino(object):
         now = self._time()
         dt =  now - self._last_calc_timestamp
         self._dt.append(dt)
+        self._input.append(input_val)
         self._Kp = self._kp
-        self._logger.debug('Kp: {0}'.format(self._Kp))
         self._Td = self._kd / self._Kp
+        
+        self._logger.debug('Kp: {0}'.format(self._Kp))
         self._logger.debug('Td: {0}'.format(self._Td))
         self._logger.debug('dt: {0}'.format(self._dt))
-        self._input.append(input_val)
         self._logger.debug('Last input values: {0}'.format(self._input))
         
+        # extend input array if not filled
         if len(self._input) < len(self._e):
-            self._input.extend([input_val,input_val,input_val])
+            self._input.extend([input_val,input_val])
             self._logger.debug('Not enough input values, all set to current input: {0}'.format(self._input))
 
         # Compute all the working error variables
@@ -94,19 +92,19 @@ class PIDArduino(object):
         datavec=np.array(self._input)
         pol=np.polyfit(timevec,datavec,1)
         polder=np.polyder(pol)
-        polder2=np.poly1d(polder)
-        diff=polder2(self._dt[0]+self._dt[1])
+        polder_fn=np.poly1d(polder)
+        derivative=polder_fn(self._dt[0]+self._dt[1])
         
-        self._logger.debug('timevec: {0}'.format(timevec))
-        self._logger.debug('datavec: {0}'.format(datavec))
-        self._logger.debug('polynomial: {0}'.format(pol))
-        self._logger.debug('polynomial derivative: {0}'.format(polder))
-        self._logger.debug('de/dt: {0}'.format(diff))
+        self._logger.debug('Time array: {0}'.format(timevec))
+        self._logger.debug('Data array: {0}'.format(datavec))
+        self._logger.debug('Polynomial: {0}'.format(pol))
+        self._logger.debug('Polynomial derivative: {0}'.format(polder))
+        self._logger.debug('de/dt: {0}'.format(derivative))
         
 
         p = self._Kp * self._e[-1]
         i = self._integral
-        d = self._Kp*self._Td*diff
+        d = self._Kp*self._Td*derivative
 
         # Compute PID Output
         self._last_output = p + i + d
@@ -120,7 +118,6 @@ class PIDArduino(object):
         self._logger.debug('output: {0}'.format(self._last_output))
 
         # Remember some variables for next time
-        self._last_input = input_val
         self._last_calc_timestamp = now
         return self._last_output
 

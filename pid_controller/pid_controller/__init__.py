@@ -91,15 +91,16 @@ class PIDArduino(object):
         
         # Derivative
         timevec=np.array([0, self._dt[0], self._dt[0]+self._dt[1]])
-        self._logger.debug('timevec: {0}'.format(timevec))
         datavec=np.array(self._input)
-        self._logger.debug('datavec: {0}'.format(datavec))
-        pol=np.polyfit(timevec,datavec,2)
-        self._logger.debug('polynomial: {0}'.format(pol))
+        pol=np.polyfit(timevec,datavec,1)
         polder=np.polyder(pol)
-        self._logger.debug('polynomial derivative: {0}'.format(polder))
         polder2=np.poly1d(polder)
         diff=polder2(self._dt[0]+self._dt[1])
+        
+        self._logger.debug('timevec: {0}'.format(timevec))
+        self._logger.debug('datavec: {0}'.format(datavec))
+        self._logger.debug('polynomial: {0}'.format(pol))
+        self._logger.debug('polynomial derivative: {0}'.format(polder))
         self._logger.debug('de/dt: {0}'.format(diff))
         
 

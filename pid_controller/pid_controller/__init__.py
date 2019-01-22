@@ -46,6 +46,7 @@ class PIDArduino(object):
         self._e = deque([0,0,0],maxlen=3)
         self._input = deque(maxlen=3)
         self._integral=0
+        self._last_output=0
 
     def calc(self, input_val, setpoint):
         """Adjusts and holds the given setpoint.

@@ -47,6 +47,8 @@ class PIDArduino(object):
         self._input = deque(maxlen=3)
         self._integral=0
         self._last_output=0
+        self._controlregion=1.5
+        self._last_setpoint=0
 
     def calc(self, input_val, setpoint):
         """Adjusts and holds the given setpoint.
@@ -64,12 +66,12 @@ class PIDArduino(object):
         self._input.append(input_val)
         self._Kp = self._kp
         self._Td = self._kd / self._Kp
-        
+
         self._logger.debug('Kp: {0}'.format(self._Kp))
         self._logger.debug('Td: {0}'.format(self._Td))
         self._logger.debug('dt: {0}'.format(self._dt))
         self._logger.debug('Last input values: {0}'.format(self._input))
-        
+
         # extend input array if not filled
         if len(self._input) < len(self._e):
             self._input.extend([input_val,input_val])
@@ -80,14 +82,18 @@ class PIDArduino(object):
         self._e.append(error)
 
         # Integral
+        # Reset integral if large setpoint change
+        if abs(setpoint - self._last_setpoint) > self._controlregion:
+            self._integral = 0
+
         if self._ki != 0:
             self._Ti = self._kp / self._ki
             self._logger.debug('Ti: {0}'.format(self._Ti))
-            if self._last_output < self._out_max and self._last_output > self._out_min:
+            if self._last_output < self._out_max and self._last_output > self._out_min and abs(error) < self._controlregion:
                 self._integral += self._Kp*(self._dt[1]/self._Ti)*self._e[2]
                 self._integral = min(self._integral, self._out_max)
                 self._integral = max(self._integral, self._out_min)
-        
+
         # Derivative
         timevec=np.array([0, self._dt[0], self._dt[0]+self._dt[1]])
         datavec=np.array(self._input)
@@ -95,13 +101,13 @@ class PIDArduino(object):
         polder=np.polyder(pol)
         polder_fn=np.poly1d(polder)
         derivative=polder_fn(self._dt[0]+self._dt[1])
-        
+
         self._logger.debug('Time array: {0}'.format(timevec))
         self._logger.debug('Data array: {0}'.format(datavec))
         self._logger.debug('Polynomial: {0}'.format(pol))
         self._logger.debug('Polynomial derivative: {0}'.format(polder))
         self._logger.debug('de/dt: {0}'.format(derivative))
-        
+
 
         p = self._Kp * self._e[-1]
         i = self._integral
@@ -120,6 +126,7 @@ class PIDArduino(object):
 
         # Remember some variables for next time
         self._last_calc_timestamp = now
+        self._last_setpoint = setpoint
         return self._last_output
 
 # Based on a fork of Arduino PID AutoTune Library

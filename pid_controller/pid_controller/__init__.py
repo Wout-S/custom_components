@@ -1,5 +1,6 @@
 import math
 import logging
+import numpy as np
 from time import time
 from collections import deque, namedtuple
 
@@ -33,17 +34,19 @@ class PIDArduino(object):
             raise ValueError('out_min must be less than out_max')
 
         self._logger = logging.getLogger(type(self).__name__)
-        self._Kp = kp
-        self._Ki = ki * sampletime
-        self._Kd = kd / sampletime
-        self._sampletime = sampletime * 1000
+        self._time = time
+        now = self._time()
+        self._last_calc_timestamp = now - sampletime
+        self._kp = kp
+        self._ki = ki
+        self._kd = kd
         self._out_min = out_min
         self._out_max = out_max
-        self._integral = 0
-        self._last_input = 0
-        self._last_output = 0
-        self._last_calc_timestamp = 0
-        self._time = time
+        self._dt = deque([sampletime,sampletime],maxlen=2)
+        self._e = deque([0,0,0],maxlen=3)
+        self._input = deque(maxlen=3)
+        self._integral=0
+        self._last_output=0
 
     def calc(self, input_val, setpoint):
         """Adjusts and holds the given setpoint.
@@ -55,24 +58,54 @@ class PIDArduino(object):
         Returns:
             A value between `out_min` and `out_max`.
         """
-        now = self._time() * 1000
-
-        if (now - self._last_calc_timestamp) < self._sampletime:
-            return self._last_output
+        now = self._time()
+        dt =  now - self._last_calc_timestamp
+        self._dt.append(dt)
+        self._input.append(input_val)
+        self._Kp = self._kp
+        self._Td = self._kd / self._Kp
+        
+        self._logger.debug('Kp: {0}'.format(self._Kp))
+        self._logger.debug('Td: {0}'.format(self._Td))
+        self._logger.debug('dt: {0}'.format(self._dt))
+        self._logger.debug('Last input values: {0}'.format(self._input))
+        
+        # extend input array if not filled
+        if len(self._input) < len(self._e):
+            self._input.extend([input_val,input_val])
+            self._logger.debug('Not enough input values, all set to current input: {0}'.format(self._input))
 
         # Compute all the working error variables
         error = setpoint - input_val
-        input_diff = input_val - self._last_input
+        self._e.append(error)
 
-        # In order to prevent windup, only integrate if the process is not saturated
-        if self._last_output < self._out_max and self._last_output > self._out_min:
-            self._integral += self._Ki * error
-            self._integral = min(self._integral, self._out_max)
-            self._integral = max(self._integral, self._out_min)
+        # Integral
+        if self._ki != 0:
+            self._Ti = self._kp / self._ki
+            self._logger.debug('Ti: {0}'.format(self._Ti))
+            if self._last_output < self._out_max and self._last_output > self._out_min:
+                self._integral += self._Kp*(self._dt[1]/self._Ti)*self._e[2]
+                self._integral = min(self._integral, self._out_max)
+                self._integral = max(self._integral, self._out_min)
+        
+        # Derivative
+        timevec=np.array([0, self._dt[0], self._dt[0]+self._dt[1]])
+        datavec=np.array(self._input)
+        pol=np.polyfit(timevec,datavec,1)
+        polder=np.polyder(pol)
+        polder_fn=np.poly1d(polder)
+        derivative=polder_fn(self._dt[0]+self._dt[1])
+        
+        self._logger.debug('Time array: {0}'.format(timevec))
+        self._logger.debug('Data array: {0}'.format(datavec))
+        self._logger.debug('Polynomial: {0}'.format(pol))
+        self._logger.debug('Polynomial derivative: {0}'.format(polder))
+        self._logger.debug('de/dt: {0}'.format(derivative))
+        
 
-        p = self._Kp * error
+        p = self._Kp * self._e[-1]
         i = self._integral
-        d = -(self._Kd * input_diff)
+        d = self._Kp*self._Td*derivative
 
         # Compute PID Output
         self._last_output = p + i + d
@@ -86,7 +119,6 @@ class PIDArduino(object):
         self._logger.debug('output: {0}'.format(self._last_output))
 
         # Remember some variables for next time
-        self._last_input = input_val
         self._last_calc_timestamp = now
         return self._last_output
 

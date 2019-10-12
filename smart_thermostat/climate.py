@@ -469,7 +469,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
     def _set_valve(self):
         """set valve opening percentage."""
         data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_VALUE: self.control_output }
-        await self.hass.services.async_call(PLATFORM_INPUT_NUMBER, SERVICE_SET_VALUE, data ))
+        await self.hass.services.async_call(PLATFORM_INPUT_NUMBER, SERVICE_SET_VALUE, data )
 
 #	@callback
 #	def _set_valve(self):

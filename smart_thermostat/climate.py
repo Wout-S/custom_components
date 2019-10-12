@@ -466,7 +466,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         await self.hass.services.async_call(HA_DOMAIN, SERVICE_TURN_OFF, data)
 
     @callback
-    def _set_valve(self):
+    async def _async_set_valve(self):
         """set valve opening percentage."""
         data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_VALUE: self.control_output }
         await self.hass.services.async_call(PLATFORM_INPUT_NUMBER, SERVICE_SET_VALUE, data )
@@ -539,7 +539,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         else:
             _LOGGER.info("Change state of heater %s to %s", self.heater_entity_id, self.control_output)
             #self.hass.states.async_set(self.heater_entity_id, self.control_output)
-            self._set_valve()
+            await self.async_set_valve()
 
     async def pwm_switch(self, time_on, time_off, time_passed):
         """turn off and on the heater proportionally to controlvalue."""

@@ -47,7 +47,7 @@ class PIDArduino(object):
         self._input = deque(maxlen=3)
         self._integral=0
         self._last_output=0
-        self._controlregion=2
+        self._controlregion=1.5
         self._last_setpoint=0
 
     def calc(self, input_val, setpoint):

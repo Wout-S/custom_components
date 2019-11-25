@@ -189,6 +189,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
 
     async def async_added_to_hass(self):
         """Run when entity about to be added."""
+        _LOGGER.info("Added to hass, searching for old state")
         await super().async_added_to_hass()
 
         # Add listener
@@ -206,17 +207,13 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         def _async_startup(event):
             """Init on startup."""
             sensor_state = self.hass.states.get(self.sensor_entity_id)
+            _LOGGER.debug("_async_startup: sensor state is %s", sensor_state)
             if sensor_state and sensor_state.state != STATE_UNKNOWN:
                 self._async_update_temp(sensor_state)
 
         self.hass.bus.async_listen_once(
             EVENT_HOMEASSISTANT_START, _async_startup)
 
-
-    async def async_added_to_hass(self):
-        """Run when entity about to be added."""
-        _LOGGER.info("Added to hass, searching for old state")
-        await super().async_added_to_hass()
         # Check If we have an old state
         old_state = await self.async_get_last_state()
         if old_state is not None:
@@ -390,6 +387,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
 
     async def _async_sensor_changed(self, entity_id, old_state, new_state):
         """Handle temperature changes."""
+        _LOGGER.debug("async_sensor_changed called")
         if new_state is None:
             return
 
@@ -405,9 +403,9 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         self.async_schedule_update_ha_state()
 
     @callback
-
     def _async_update_temp(self, state):
         """Update thermostat with latest state from sensor."""
+        _LOGGER.debug("_async_update_temp called")
         try:
             self._cur_temp = float(state.state)
         except ValueError as ex:
@@ -415,6 +413,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
 
     async def _async_control_heating(self, time=None, force=False):
         """Run PID controller, optional autotune for faster integration"""
+        _LOGGER.debug("_async_control_heating called")
         async with self._temp_lock:
             if not self._active and None not in (self._cur_temp,
                                                  self._target_temp):
@@ -424,6 +423,9 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
                              self._cur_temp, self._target_temp)
 
             if not self._active or self._hvac_mode == HVAC_MODE_OFF:
+                _LOGGER.info("Not active or hvac_mode==off")
+                if not self._active:
+                    _LOGGER.info("Smart thermostat is not active")
                 return
 
             #if not force and time is None:
@@ -465,7 +467,6 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         data = {ATTR_ENTITY_ID: self.heater_entity_id}
         await self.hass.services.async_call(HA_DOMAIN, SERVICE_TURN_OFF, data)
 
-    @callback
     async def _async_set_valve(self):
         """set valve opening percentage."""
         data = {ATTR_ENTITY_ID: self.heater_entity_id, ATTR_VALUE: self.control_output }
@@ -496,7 +497,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         await self.async_update_ha_state()
 
 
-    def calc_output(self):
+    async def calc_output(self):
         """calculate controll output and handle autotune"""
         if self.autotune != "none" :
             if self.pidAutotune.run(self._cur_temp):
@@ -539,7 +540,7 @@ class SmartThermostat(ClimateDevice, RestoreEntity):
         else:
             _LOGGER.info("Change state of heater %s to %s", self.heater_entity_id, self.control_output)
             #self.hass.states.async_set(self.heater_entity_id, self.control_output)
-            await self.async_set_valve()
+            await self._async_set_valve()
 
     async def pwm_switch(self, time_on, time_off, time_passed):
         """turn off and on the heater proportionally to controlvalue."""
